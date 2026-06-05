@@ -1,25 +1,50 @@
 {
   "expo": {
-    "name": "forge-app",
+    "name": "Forge",
     "slug": "forge-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0E0E0C"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pushmodecracker23.forge",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Forge uses the camera to scan food barcodes.",
+        "NSPhotoLibraryUsageDescription": "Forge uses your photo library to save physique photos.",
+        "NSHealthShareUsageDescription": "Forge reads workout and activity data from Apple Health.",
+        "NSHealthUpdateUsageDescription": "Forge writes workout data to Apple Health."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0E0E0C",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.pushmodecracker23.forge",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF4D00"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "forge-app"
+      }
     }
   }
 }

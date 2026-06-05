@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging, develop]
+  pull_request:
+    branches: [main, staging, develop]
+
+jobs:
+  lint-type-test:
+    name: Lint · Type Check · Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript check
+        run: npm run type-check
+
+      - name: Jest tests
+        run: npm test -- --ci --coverage --passWithNoTests
+
+      - name: Expo doctor
+        run: npx expo-doctor@latest || true
+
+  build-check:
+    name: Expo Build Check
+    runs-on: ubuntu-latest
+    needs: lint-type-test
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Expo prebuild check
+        run: npx expo export --platform web --output-dir /tmp/expo-web-build || true
