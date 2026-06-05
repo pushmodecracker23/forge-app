@@ -12,6 +12,7 @@ import { useProfileStore } from './store/profileStore';
 import { Profile } from './types/database';
 
 import AuthScreen from './screens/AuthScreen';
+import EmailVerificationScreen from './screens/EmailVerificationScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import FoodLogScreen from './screens/FoodLogScreen';
@@ -19,6 +20,7 @@ import WorkoutScreen from './screens/WorkoutScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MotivationScreen from './screens/MotivationScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,7 +70,7 @@ function MainTabs({ navigation }: { navigation: any }) {
         {() => <ProgressScreen />}
       </Tab.Screen>
       <Tab.Screen name="Me" options={{ tabBarIcon: ({ focused }) => <TabIcon name="Me" focused={focused} /> }}>
-        {() => <ProfileScreen />}
+        {(props) => <ProfileScreen {...props} navigation={props.navigation} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -101,7 +103,10 @@ function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
-          <Stack.Screen name="Auth" component={AuthScreen} />
+          <>
+            <Stack.Screen name="Auth" component={AuthScreen} />
+            <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+          </>
         ) : !profile ? (
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (
@@ -110,6 +115,11 @@ function RootNavigator() {
             <Stack.Screen
               name="Motivation"
               component={MotivationScreen}
+              options={{ presentation: 'modal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
               options={{ presentation: 'modal', headerShown: false }}
             />
           </>

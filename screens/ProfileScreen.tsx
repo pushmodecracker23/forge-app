@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useProfileStore } from '../store/profileStore';
 import Card from '../components/Card';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }: { navigation?: any }) {
   const theme = useTheme();
   const { toggleTheme } = useThemeContext();
   const { signOut, user } = useAuth();
@@ -88,7 +88,12 @@ export default function ProfileScreen() {
         </Card>
 
         <Card style={{ marginHorizontal: 16 }}>
-          <TouchableOpacity style={[s.btn, { backgroundColor: theme.surface2 }]} onPress={toggleTheme}>
+          {navigation && (
+            <TouchableOpacity style={[s.btn, { backgroundColor: theme.surface2 }]} onPress={() => navigation.navigate('Settings')}>
+              <Text style={[s.btnText, { color: theme.text }]}>⚙️ Settings</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[s.btn, { backgroundColor: theme.surface2, marginTop: 8 }]} onPress={toggleTheme}>
             <Text style={[s.btnText, { color: theme.text }]}>{theme.isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.btn, { backgroundColor: '#FF4444' + '20', marginTop: 8 }]} onPress={handleSignOut}>

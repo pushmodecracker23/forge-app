@@ -2,17 +2,17 @@ import { calculateBMR, calculateTDEE, calculateMacros } from '../lib/tdee';
 
 describe('calculateBMR', () => {
   it('calculates male BMR correctly', () => {
-    const bmr = calculateBMR(80, 180, 25, true);
+    const bmr = calculateBMR(80, 180, 25, 'male');
     expect(bmr).toBeCloseTo(1805, 0);
   });
 
   it('calculates female BMR correctly', () => {
-    const bmr = calculateBMR(60, 165, 30, false);
+    const bmr = calculateBMR(60, 165, 30, 'female');
     expect(bmr).toBeCloseTo(1320.25, 0);
   });
 
   it('handles edge case low values', () => {
-    const bmr = calculateBMR(40, 150, 18, true);
+    const bmr = calculateBMR(40, 150, 18, 'male');
     expect(bmr).toBeGreaterThan(0);
   });
 });

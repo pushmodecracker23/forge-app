@@ -2,11 +2,13 @@ export type Goal = 'cut' | 'bulk' | 'maintain' | 'recomp';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type WorkoutSource = 'manual' | 'apple_health';
+export type Gender = 'male' | 'female';
 
 export interface Profile {
   id: string;
   user_id: string;
   name: string;
+  full_name?: string;
   age: number;
   height_cm: number;
   current_weight: number;
@@ -18,6 +20,8 @@ export interface Profile {
   carbs_target: number;
   fat_target: number;
   calorie_target: number;
+  gender?: Gender;
+  deficit_kcal?: number;
   created_at: string;
 }
 
@@ -91,6 +95,7 @@ export interface BodyWeightLog {
   user_id: string;
   date: string;
   weight_kg: number;
+  note?: string;
   created_at: string;
 }
 
