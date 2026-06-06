@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, PanResponder,
+  RefreshControl, PanResponder, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { useFoodStore } from '../store/foodStore';
 import { useProfileStore } from '../store/profileStore';
-import AnimatedRing from '../components/AnimatedRing';
-import MacroBar from '../components/MacroBar';
-import Card from '../components/Card';
+import GradientBg from '../components/GradientBg';
 import { FoodLog } from '../types/database';
+import { getHealthData, getExercises, ExerciseEntry } from '../lib/healthService';
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -28,17 +30,204 @@ function dateLabel(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// ─── Multicolor Calorie Ring ──────────────────────────────────────────────────
+
+interface CalorieRingProps {
+  carbs: number;
+  protein: number;
+  fat: number;
+  target: number;
+}
+
+function CalorieRing({ carbs, protein, fat, target }: CalorieRingProps) {
+  const R = 75;
+  const SW = 16;
+  const C = 2 * Math.PI * R;
+  const SIZE = 180;
+
+  const caloriesEaten = carbs * 4 + protein * 4 + fat * 9;
+  const caloriesLeft = Math.max(target - caloriesEaten, 0);
+  const fillFraction = Math.min(caloriesEaten / (target || 2000), 1);
+
+  const carbsFrac = caloriesEaten > 0 ? (carbs * 4) / caloriesEaten : 0;
+  const proteinFrac = caloriesEaten > 0 ? (protein * 4) / caloriesEaten : 0;
+  const fatFrac = caloriesEaten > 0 ? (fat * 9) / caloriesEaten : 0;
+
+  const carbsLen = carbsFrac * fillFraction * C;
+  const proteinLen = proteinFrac * fillFraction * C;
+  const fatLen = fatFrac * fillFraction * C;
+
+  const carbsStartDeg = -90;
+  const proteinStartDeg = -90 + carbsFrac * fillFraction * 360;
+  const fatStartDeg = proteinStartDeg + proteinFrac * fillFraction * 360;
+
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+        {/* Background track */}
+        <Circle
+          cx={90} cy={90} r={R}
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth={SW}
+        />
+        {/* Carbs arc – cyan */}
+        {carbsLen > 0 && (
+          <Circle
+            cx={90} cy={90} r={R}
+            fill="none"
+            stroke="#00D4D4"
+            strokeWidth={SW}
+            strokeDasharray={`${carbsLen} ${C}`}
+            strokeDashoffset={0}
+            strokeLinecap="round"
+            transform={`rotate(${carbsStartDeg} 90 90)`}
+          />
+        )}
+        {/* Protein arc – pink */}
+        {proteinLen > 0 && (
+          <Circle
+            cx={90} cy={90} r={R}
+            fill="none"
+            stroke="#FF6B9D"
+            strokeWidth={SW}
+            strokeDasharray={`${proteinLen} ${C}`}
+            strokeDashoffset={0}
+            strokeLinecap="round"
+            transform={`rotate(${proteinStartDeg} 90 90)`}
+          />
+        )}
+        {/* Fat arc – amber */}
+        {fatLen > 0 && (
+          <Circle
+            cx={90} cy={90} r={R}
+            fill="none"
+            stroke="#FFB800"
+            strokeWidth={SW}
+            strokeDasharray={`${fatLen} ${C}`}
+            strokeDashoffset={0}
+            strokeLinecap="round"
+            transform={`rotate(${fatStartDeg} 90 90)`}
+          />
+        )}
+      </Svg>
+      {/* Center text overlay */}
+      <View style={StyleSheet.absoluteFillObject as any} pointerEvents="none">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 36, fontWeight: '700', lineHeight: 40 }}>
+            {caloriesLeft}
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+            {'Calories\nLeft'}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Steps Ring (small) ───────────────────────────────────────────────────────
+
+function StepsRing({ steps }: { steps: number }) {
+  const R = 22;
+  const SW = 5;
+  const C = 2 * Math.PI * R;
+  const frac = Math.min(steps / 10000, 1);
+  const len = frac * C;
+
+  return (
+    <Svg width={56} height={56} viewBox="0 0 56 56">
+      <Circle cx={28} cy={28} r={R} fill="none" stroke="rgba(255,107,157,0.2)" strokeWidth={SW} />
+      {len > 0 && (
+        <Circle
+          cx={28} cy={28} r={R}
+          fill="none"
+          stroke="#FF6B9D"
+          strokeWidth={SW}
+          strokeDasharray={`${len} ${C}`}
+          strokeDashoffset={0}
+          strokeLinecap="round"
+          transform="rotate(-90 28 28)"
+        />
+      )}
+    </Svg>
+  );
+}
+
+// ─── Segmented Control ────────────────────────────────────────────────────────
+
+type Tab = 'Macros' | 'Nutrients' | 'Calories';
+
+interface SegmentedControlProps {
+  active: Tab;
+  onChange: (t: Tab) => void;
+}
+
+function SegmentedControl({ active, onChange }: SegmentedControlProps) {
+  const tabs: Tab[] = ['Macros', 'Nutrients', 'Calories'];
+  return (
+    <View style={sc.wrapper}>
+      {tabs.map((t) => (
+        <TouchableOpacity
+          key={t}
+          style={[sc.pill, active === t && sc.activePill]}
+          onPress={() => onChange(t)}
+          activeOpacity={0.8}
+        >
+          <Text style={[sc.label, active === t && sc.activeLabel]}>{t}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+const sc = StyleSheet.create({
+  wrapper: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 4,
+    marginHorizontal: 16,
+    marginBottom: 14,
+  },
+  pill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  activePill: {
+    backgroundColor: '#1A6FFF',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeLabel: {
+    color: '#FFFFFF',
+  },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function DashboardScreen({ navigation }: { navigation: any }) {
   const theme = useTheme();
   const { user } = useAuth();
-  const { todayLogs, setTodayLogs } = useFoodStore();
+  const { setTodayLogs } = useFoodStore();
   const { profile } = useProfileStore();
+
   const [refreshing, setRefreshing] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [dateLogs, setDateLogs] = useState<FoodLog[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>('Macros');
+  const [waterOz, setWaterOz] = useState(0);
+  const [steps, setSteps] = useState(0);
+  const [exercises, setExercises] = useState<ExerciseEntry[]>([]);
 
   const isToday = formatDate(currentDate) === formatDate(new Date());
 
+  // Load food logs for the selected date
   const loadLogs = useCallback(async (date: Date) => {
     if (!user) return;
     const { data } = await supabase
@@ -53,6 +242,15 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
   }, [user, isToday]);
 
   useEffect(() => { loadLogs(currentDate); }, [currentDate, user]);
+
+  // Load health service data once
+  useEffect(() => {
+    getHealthData().then((d) => {
+      setWaterOz(d.waterOz);
+      setSteps(d.steps);
+    });
+    getExercises().then(setExercises);
+  }, []);
 
   const changeDay = (delta: number) => {
     const next = new Date(currentDate);
@@ -74,120 +272,358 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
     setRefreshing(false);
   };
 
-  const logs = dateLogs;
-  const totalKcal = logs.reduce((s, l) => s + l.kcal, 0);
-  const totalProtein = logs.reduce((s, l) => s + l.protein, 0);
-  const totalCarbs = logs.reduce((s, l) => s + l.carbs, 0);
-  const totalFat = logs.reduce((s, l) => s + l.fat, 0);
+  // Macro totals
+  const totalKcal = dateLogs.reduce((s, l) => s + l.kcal, 0);
+  const totalProtein = dateLogs.reduce((s, l) => s + l.protein, 0);
+  const totalCarbs = dateLogs.reduce((s, l) => s + l.carbs, 0);
+  const totalFat = dateLogs.reduce((s, l) => s + l.fat, 0);
   const calorieTarget = profile?.calorie_target ?? 2000;
-
-  const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bg },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-    greeting: { fontSize: 18, fontWeight: '700', color: theme.text },
-    subGreeting: { fontSize: 13, color: theme.muted, marginTop: 2 },
-    dateNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 16 },
-    navBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-    navBtnText: { fontSize: 16, color: theme.text },
-    dateLabel: { fontSize: 17, fontWeight: '700', color: theme.text, minWidth: 140, textAlign: 'center' },
-    todayBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: theme.accent + '20' },
-    todayBtnText: { fontSize: 12, fontWeight: '700', color: theme.accent },
-    ringSection: { alignItems: 'center', paddingVertical: 8 },
-    statsRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-    statChip: { backgroundColor: theme.surface2, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: theme.border },
-    statText: { fontSize: 12, color: theme.muted, fontWeight: '500' },
-    sectionTitle: { fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 10 },
-    logItem: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.border,
-    },
-    logLeft: { flex: 1 },
-    logName: { fontSize: 14, fontWeight: '600', color: theme.text },
-    logMeta: { fontSize: 12, color: theme.muted, marginTop: 2 },
-    logKcal: { fontSize: 14, fontWeight: '700', color: theme.accent },
-    emptyText: { color: theme.muted, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
-    temptBtn: {
-      margin: 16, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
-      borderRadius: 14, padding: 14, alignItems: 'center',
-    },
-    temptText: { color: theme.muted, fontSize: 14 },
-    mealBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: theme.surface2, marginLeft: 6 },
-    mealBadgeText: { fontSize: 10, color: theme.muted, textTransform: 'capitalize' },
-  });
+  const caloriesLeft = Math.max(calorieTarget - totalKcal, 0);
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <View>
-          <Text style={s.greeting}>Hey, {profile?.name ?? 'Athlete'} 👊</Text>
-          <Text style={s.subGreeting}>Let's make today count</Text>
-        </View>
-      </View>
-
-      {/* Date navigation */}
-      <View style={s.dateNav}>
-        <TouchableOpacity style={s.navBtn} onPress={() => changeDay(-1)}>
-          <Text style={s.navBtnText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={s.dateLabel}>{dateLabel(currentDate)}</Text>
-        <TouchableOpacity style={s.navBtn} onPress={() => changeDay(1)}>
-          <Text style={s.navBtnText}>›</Text>
-        </TouchableOpacity>
-        {!isToday && (
-          <TouchableOpacity style={s.todayBtn} onPress={() => setCurrentDate(new Date())}>
-            <Text style={s.todayBtnText}>Today</Text>
+    <GradientBg>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}>≡</Text>
           </TouchableOpacity>
-        )}
-      </View>
 
-      <ScrollView
-        {...panResponder.panHandlers}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
-      >
-        {/* Calorie Ring */}
-        <View style={s.ringSection}>
-          <AnimatedRing eaten={totalKcal} target={calorieTarget} burned={0} />
-          <View style={s.statsRow}>
-            <View style={s.statChip}><Text style={s.statText}>🍽 {totalKcal} eaten</Text></View>
-            <View style={s.statChip}><Text style={s.statText}>🎯 {calorieTarget} target</Text></View>
+          <View style={styles.dateRow}>
+            <TouchableOpacity onPress={() => changeDay(-1)} style={styles.arrowBtn}>
+              <Text style={styles.arrowText}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.dateLabel}>{dateLabel(currentDate)}</Text>
+            <TouchableOpacity onPress={() => changeDay(1)} style={styles.arrowBtn}>
+              <Text style={styles.arrowText}>›</Text>
+            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}>🔔</Text>
+            {/* red dot */}
+            <View style={styles.notifDot} />
+          </TouchableOpacity>
         </View>
 
-        {/* Macros */}
-        <Card style={{ marginHorizontal: 16 }}>
-          <Text style={s.sectionTitle}>Macros</Text>
-          <MacroBar label="Protein" current={Math.round(totalProtein)} target={profile?.protein_target ?? 150} color={theme.protein} />
-          <MacroBar label="Carbs" current={Math.round(totalCarbs)} target={profile?.carbs_target ?? 200} color={theme.carbs} />
-          <MacroBar label="Fat" current={Math.round(totalFat)} target={profile?.fat_target ?? 65} color={theme.fat} />
-        </Card>
+        {/* ── Segmented control ── */}
+        <SegmentedControl active={activeTab} onChange={setActiveTab} />
 
-        {/* Food log */}
-        <Card style={{ marginHorizontal: 16 }}>
-          <Text style={s.sectionTitle}>
-            {isToday ? "Today's Food" : `Food on ${dateLabel(currentDate)}`}
-          </Text>
-          {logs.length === 0 ? (
-            <Text style={s.emptyText}>{isToday ? 'No food logged yet. Add something!' : 'Nothing logged on this day.'}</Text>
-          ) : (
-            logs.map(log => (
-              <View key={log.id} style={s.logItem}>
-                <View style={s.logLeft}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={s.logName}>{log.food_name}</Text>
-                    <View style={s.mealBadge}><Text style={s.mealBadgeText}>{log.meal_type}</Text></View>
+        <ScrollView
+          {...panResponder.panHandlers}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ═══════════════════════ MACROS TAB ═══════════════════════ */}
+          {activeTab === 'Macros' && (
+            <>
+              {/* Blue card with ring */}
+              <View style={styles.blueCard}>
+                <CalorieRing
+                  carbs={totalCarbs}
+                  protein={totalProtein}
+                  fat={totalFat}
+                  target={calorieTarget}
+                />
+
+                {/* Macro dots row */}
+                <View style={styles.macroDotsRow}>
+                  {/* Carbs */}
+                  <View style={styles.macroDot}>
+                    <View style={[styles.dot, { backgroundColor: '#00D4D4' }]} />
+                    <Text style={styles.dotValue}>{Math.round(totalCarbs)}g</Text>
+                    <Text style={styles.dotLabel}>Carbs</Text>
                   </View>
-                  <Text style={s.logMeta}>P {log.protein}g · C {log.carbs}g · F {log.fat}g · {log.serving_g}g</Text>
+                  {/* Protein */}
+                  <View style={styles.macroDot}>
+                    <View style={[styles.dot, { backgroundColor: '#FF6B9D' }]} />
+                    <Text style={styles.dotValue}>{Math.round(totalProtein)}g</Text>
+                    <Text style={styles.dotLabel}>Protein</Text>
+                  </View>
+                  {/* Fat */}
+                  <View style={styles.macroDot}>
+                    <View style={[styles.dot, { backgroundColor: '#FFB800' }]} />
+                    <Text style={styles.dotValue}>{Math.round(totalFat)}g</Text>
+                    <Text style={styles.dotLabel}>Fat</Text>
+                  </View>
                 </View>
-                <Text style={s.logKcal}>{log.kcal}</Text>
               </View>
-            ))
-          )}
-        </Card>
 
-        <TouchableOpacity style={s.temptBtn} onPress={() => navigation.navigate('Motivation')}>
-          <Text style={s.temptText}>🧠 Feeling tempted? Tap here.</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+              {/* ── Water + Steps cards ── */}
+              <View style={styles.smallCardsRow}>
+                {/* Water */}
+                <View style={[styles.smallCard, { flex: 1, marginRight: 6 }]}>
+                  <Text style={styles.cardTitle}>Water</Text>
+                  <Text style={{ fontSize: 36, marginVertical: 4 }}>💧</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+                    <Text style={styles.bigValue}>{waterOz.toFixed(1)}</Text>
+                    <Text style={styles.smallUnit}>FL OZ</Text>
+                  </View>
+                  <View style={styles.counterRow}>
+                    <TouchableOpacity
+                      style={styles.counterBtn}
+                      onPress={() => setWaterOz((v) => Math.max(0, v - 8))}
+                    >
+                      <Text style={styles.counterBtnText}>–</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.counterBtn}
+                      onPress={() => setWaterOz((v) => v + 8)}
+                    >
+                      <Text style={styles.counterBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Walking */}
+                <View style={[styles.smallCard, { flex: 1, marginLeft: 6 }]}>
+                  <Text style={styles.cardTitle}>Walking</Text>
+                  <StepsRing steps={steps} />
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 4 }}>
+                    <Text style={styles.bigValue}>{steps.toLocaleString()}</Text>
+                  </View>
+                  <Text style={styles.smallUnit}>Steps</Text>
+                </View>
+              </View>
+
+              {/* ── Apple Watch banner ── */}
+              <TouchableOpacity
+                style={styles.watchBanner}
+                onPress={() =>
+                  Alert.alert(
+                    'Apple Watch',
+                    'TODO: real HealthKit — requires EAS Build, mocked for Expo Go',
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <View style={styles.watchBannerLeft} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.watchTitle}>⌚ Apple Watch — tap to connect</Text>
+                  <Text style={styles.watchSub}>Sync workouts &amp; activity</Text>
+                </View>
+                <Text style={{ color: theme.muted, fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+
+              {/* ── Exercise section ── */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Exercise</Text>
+                <TouchableOpacity
+                  style={styles.addBtn}
+                  onPress={() => navigation.navigate('Workout')}
+                >
+                  <Text style={styles.addBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {exercises.map((ex) => (
+                <View key={ex.id} style={styles.exerciseCard}>
+                  <View style={[styles.exerciseIconBg, { backgroundColor: ex.color }]}>
+                    <Text style={{ fontSize: 28 }}>{ex.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.exerciseName}>{ex.name}</Text>
+                    <Text style={styles.exerciseMeta}>{ex.durationMin} min</Text>
+                  </View>
+                  <Text style={styles.exerciseKcal}>{ex.kcal} kcal</Text>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* ═══════════════════════ NUTRIENTS TAB ═══════════════════════ */}
+          {activeTab === 'Nutrients' && (
+            <View style={styles.simpleCard}>
+              <Text style={styles.simpleCardText}>Nutrients breakdown coming soon</Text>
+            </View>
+          )}
+
+          {/* ═══════════════════════ CALORIES TAB ═══════════════════════ */}
+          {activeTab === 'Calories' && (
+            <View style={styles.simpleCard}>
+              <View style={styles.calRow}>
+                <Text style={styles.calLabel}>Goal</Text>
+                <Text style={styles.calValue}>{calorieTarget} kcal</Text>
+              </View>
+              <View style={styles.calDivider} />
+              <View style={styles.calRow}>
+                <Text style={styles.calLabel}>Eaten</Text>
+                <Text style={[styles.calValue, { color: theme.accent }]}>{totalKcal} kcal</Text>
+              </View>
+              <View style={styles.calDivider} />
+              <View style={styles.calRow}>
+                <Text style={styles.calLabel}>Remaining</Text>
+                <Text style={[styles.calValue, { color: theme.success }]}>{caloriesLeft} kcal</Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </GradientBg>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnText: { fontSize: 20, color: '#FFFFFF' },
+  notifDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F44336',
+    borderWidth: 1.5,
+    borderColor: '#1A6FFF',
+  },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  arrowBtn: { padding: 6 },
+  arrowText: { fontSize: 22, color: '#FFFFFF', fontWeight: '300' },
+  dateLabel: { fontSize: 17, fontWeight: '700', color: '#FFFFFF', minWidth: 90, textAlign: 'center' },
+
+  // Blue card
+  blueCard: {
+    backgroundColor: '#1A6FFF',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    padding: 20,
+    marginBottom: 14,
+    alignItems: 'center',
+    // subtle inner shadow via border
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  macroDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 16,
+  },
+  macroDot: { alignItems: 'center', gap: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotValue: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginTop: 2 },
+  dotLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+
+  // Small cards row
+  smallCardsRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 14,
+  },
+  smallCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+  },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: '#1A1A2E', marginBottom: 2 },
+  bigValue: { fontSize: 22, fontWeight: '700', color: '#1A1A2E' },
+  smallUnit: { fontSize: 11, color: '#6B7280', fontWeight: '500' },
+  counterRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  counterBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#1A6FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterBtnText: { fontSize: 20, color: '#1A6FFF', fontWeight: '600', lineHeight: 24 },
+
+  // Apple Watch banner
+  watchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 14,
+    overflow: 'hidden',
+  },
+  watchBannerLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: '#1A6FFF',
+  },
+  watchTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A2E', paddingLeft: 12 },
+  watchSub: { fontSize: 12, color: '#6B7280', marginTop: 2, paddingLeft: 12 },
+
+  // Exercise section
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1A6FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBtnText: { fontSize: 22, color: '#FFFFFF', fontWeight: '300', lineHeight: 28 },
+  exerciseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 12,
+  },
+  exerciseIconBg: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
+  exerciseMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  exerciseKcal: { fontSize: 14, fontWeight: '700', color: '#1A6FFF' },
+
+  // Simple placeholder cards
+  simpleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    padding: 20,
+  },
+  simpleCardText: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
+
+  // Calories tab
+  calRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
+  calLabel: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
+  calValue: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
+  calDivider: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)' },
+});
