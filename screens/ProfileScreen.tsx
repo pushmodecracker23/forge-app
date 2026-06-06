@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, useThemeContext } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
 import { useProfileStore } from '../store/profileStore';
 import Card from '../components/Card';
@@ -90,7 +91,10 @@ export default function ProfileScreen({ navigation }: { navigation?: any }) {
         <Card style={{ marginHorizontal: 16 }}>
           {navigation && (
             <TouchableOpacity style={[s.btn, { backgroundColor: theme.surface2 }]} onPress={() => navigation.navigate('Settings')}>
-              <Text style={[s.btnText, { color: theme.text }]}>⚙️ Settings</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="settings-outline" size={18} color={theme.text} />
+                <Text style={[s.btnText, { color: theme.text }]}>Settings</Text>
+              </View>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[s.btn, { backgroundColor: theme.surface2, marginTop: 8 }]} onPress={toggleTheme}>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
   ActivityIndicator, Alert, Modal, ScrollView,
@@ -14,13 +15,15 @@ import { searchFood, lookupBarcode, FoodItem } from '../lib/openfoodfacts';
 import { MealType, SavedMeal, FoodLog } from '../types/database';
 import GradientBg from '../components/GradientBg';
 import MacroRing from '../components/MacroRing';
+import { Ionicons } from '@expo/vector-icons';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-const MEAL_ICONS: Record<MealType, string> = {
-  breakfast: '🌅',
-  lunch: '☀️',
-  dinner: '🌙',
-  snack: '🍎',
+type IoniconName = 'sunny-outline' | 'partly-sunny-outline' | 'moon-outline' | 'cafe-outline';
+const MEAL_ICONS: Record<MealType, IoniconName> = {
+  breakfast: 'sunny-outline',
+  lunch: 'partly-sunny-outline',
+  dinner: 'moon-outline',
+  snack: 'cafe-outline',
 };
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -41,14 +44,12 @@ function formatDate(date: Date) {
 
 function dateLabel(date: Date) {
   const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (formatDate(date) === formatDate(today)) return 'Today';
-  if (formatDate(date) === formatDate(yesterday)) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  if (formatDate(date) === formatDate(today)) return `Today, ${dateStr}`;
+  return dateStr;
 }
 
-export default function FoodLogScreen() {
+export default function FoodLogScreen({ navigation }: { navigation?: any }) {
   const theme = useTheme();
   const { user } = useAuth();
   const { addLog, setTodayLogs } = useFoodStore();
@@ -107,6 +108,11 @@ export default function FoodLogScreen() {
   useEffect(() => {
     loadFoodLogs(currentDate);
   }, [currentDate, user]);
+
+  // Reload when navigating back from AddFoodScreen / FoodDetailScreen
+  useFocusEffect(useCallback(() => {
+    loadFoodLogs(currentDate);
+  }, [currentDate, user]));
 
   useEffect(() => {
     loadSavedMeals();
@@ -273,11 +279,11 @@ export default function FoodLogScreen() {
           <Text style={styles.headerTitle}>Food Log</Text>
           <View style={styles.dateNav}>
             <TouchableOpacity onPress={() => changeDay(-1)} style={styles.navBtn}>
-              <Text style={styles.navBtnText}>‹</Text>
+              <Ionicons name="chevron-back" size={20} color="#FFF" />
             </TouchableOpacity>
             <Text style={styles.dateLabel}>{dateLabel(currentDate)}</Text>
             <TouchableOpacity onPress={() => changeDay(1)} style={styles.navBtn}>
-              <Text style={styles.navBtnText}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -343,7 +349,7 @@ export default function FoodLogScreen() {
                 {/* Blue header card */}
                 <View style={styles.mealHeader}>
                   <View style={styles.mealHeaderLeft}>
-                    <Text style={styles.mealIcon}>{MEAL_ICONS[meal]}</Text>
+                    <Ionicons name={MEAL_ICONS[meal]} size={20} color="#FFF" style={{ marginRight: 4 }} />
                     <View>
                       <Text style={styles.mealName}>{MEAL_LABELS[meal]}</Text>
                       <Text style={styles.mealKcal}>{totalKcal > 0 ? `${totalKcal} kcal` : 'No food logged'}</Text>
@@ -352,14 +358,16 @@ export default function FoodLogScreen() {
                   <TouchableOpacity
                     style={styles.mealAddBtn}
                     onPress={() => {
-                      setAddingToMeal(meal);
-                      setSelectedMealForAdd(meal);
-                      setSearchQuery('');
-                      setSearchResults([]);
-                      setModalItem(null);
+                      if (navigation) {
+                        navigation.navigate('AddFood', { mealType: meal, date: formatDate(currentDate) });
+                      } else {
+                        setAddingToMeal(meal);
+                        setSelectedMealForAdd(meal);
+                        setSearchQuery(''); setSearchResults([]); setModalItem(null);
+                      }
                     }}
                   >
-                    <Text style={styles.mealAddBtnText}>+</Text>
+                    <Ionicons name="add" size={18} color="#1A6FFF" />
                   </TouchableOpacity>
                 </View>
 
@@ -369,7 +377,12 @@ export default function FoodLogScreen() {
                     <Text style={styles.emptyMealText}>Tap + to add food</Text>
                   ) : (
                     items.map((log, idx) => (
-                      <View key={log.id} style={[styles.foodItem, idx < items.length - 1 && styles.foodItemBorder]}>
+                      <TouchableOpacity
+                        key={log.id}
+                        style={[styles.foodItem, idx < items.length - 1 && styles.foodItemBorder]}
+                        onPress={() => navigation?.navigate('FoodDetail', { foodLog: log, mealType: log.meal_type, date: formatDate(currentDate) })}
+                        activeOpacity={0.7}
+                      >
                         <View style={{ flex: 1 }}>
                           <View style={styles.foodItemRow}>
                             <Text style={styles.foodItemName}>{log.food_name}</Text>
@@ -383,9 +396,9 @@ export default function FoodLogScreen() {
                           )}
                         </View>
                         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteLog(log)}>
-                          <Text style={styles.deleteBtnText}>🗑</Text>
+                          <Ionicons name="trash-outline" size={16} color="#F44336" />
                         </TouchableOpacity>
-                      </View>
+                      </TouchableOpacity>
                     ))
                   )}
                 </View>

@@ -1,34 +1,22 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 
 interface CustomTabBarProps extends BottomTabBarProps {
   onFabPress?: () => void;
 }
 
-// Icon map — keyed by route name (case-insensitive match)
-const ROUTE_META: Record<
-  string,
-  { icon: string; activeIcon: string; label: string }
-> = {
-  Home:    { icon: '🏠', activeIcon: '🏠', label: 'Home' },
-  Log:     { icon: '✏️',  activeIcon: '✏️',  label: 'Log'  },
-  Stats:   { icon: '📊', activeIcon: '📊', label: 'Stats' },
-  Profile: { icon: '👤', activeIcon: '👤', label: 'Profile' },
+type RouteIconKey = 'home-outline' | 'home' | 'pencil-outline' | 'pencil' | 'bar-chart-outline' | 'bar-chart' | 'person-outline' | 'person';
+
+const ROUTE_META: Record<string, { icon: RouteIconKey; activeIcon: RouteIconKey; label: string }> = {
+  Home:    { icon: 'home-outline',       activeIcon: 'home',        label: 'Home'    },
+  Log:     { icon: 'pencil-outline',     activeIcon: 'pencil',      label: 'Log'     },
+  Stats:   { icon: 'bar-chart-outline',  activeIcon: 'bar-chart',   label: 'Stats'   },
+  Profile: { icon: 'person-outline',     activeIcon: 'person',      label: 'Profile' },
 };
 
-export default function CustomTabBar({
-  state,
-  descriptors,
-  navigation,
-  onFabPress,
-}: CustomTabBarProps) {
+export default function CustomTabBar({ state, descriptors, navigation, onFabPress }: CustomTabBarProps) {
   const [fabOpen, setFabOpen] = useState(false);
 
   const handleFabPress = () => {
@@ -37,10 +25,6 @@ export default function CustomTabBar({
     onFabPress?.();
   };
 
-  // Build the visual slot list:
-  // slots 0-1 → route indices 0-1
-  // slot 2   → FAB (no route)
-  // slots 3-4 → route indices 2-3
   const slots: Array<{ type: 'tab'; routeIndex: number } | { type: 'fab' }> = [
     { type: 'tab', routeIndex: 0 },
     { type: 'tab', routeIndex: 1 },
@@ -62,7 +46,7 @@ export default function CustomTabBar({
                 accessibilityRole="button"
                 accessibilityLabel="Quick action"
               >
-                <Text style={styles.fabIcon}>{fabOpen ? '✕' : '+'}</Text>
+                <Ionicons name={fabOpen ? 'close' : 'add'} size={28} color="#FFF" />
               </TouchableOpacity>
             </View>
           );
@@ -70,36 +54,16 @@ export default function CustomTabBar({
 
         const { routeIndex } = slot;
         const route = state.routes[routeIndex];
-
-        // Guard: if the navigator has fewer routes than expected, skip
         if (!route) return null;
 
         const isFocused = state.index === routeIndex;
-        const meta = ROUTE_META[route.name] ?? {
-          icon: '●',
-          activeIcon: '●',
-          label: route.name,
-        };
-        const iconColor = isFocused ? '#1A6FFF' : '#9CA3AF';
-        const labelColor = isFocused ? '#1A6FFF' : '#9CA3AF';
+        const meta = ROUTE_META[route.name] ?? { icon: 'ellipse-outline', activeIcon: 'ellipse', label: route.name };
+        const iconName = (isFocused ? meta.activeIcon : meta.icon) as any;
+        const color = isFocused ? '#1A6FFF' : '#9CA3AF';
 
         const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
-
-        const onLongPress = () => {
-          navigation.emit({
-            type: 'tabLongPress',
-            target: route.key,
-          });
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
         };
 
         return (
@@ -107,18 +71,14 @@ export default function CustomTabBar({
             key={route.key}
             style={styles.tabItem}
             onPress={onPress}
-            onLongPress={onLongPress}
+            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={descriptors[route.key]?.options?.tabBarAccessibilityLabel}
           >
-            <Text style={[styles.tabIcon, { color: iconColor }]}>
-              {isFocused ? meta.activeIcon : meta.icon}
-            </Text>
-            <Text style={[styles.tabLabel, { color: labelColor }]}>
-              {meta.label}
-            </Text>
+            <Ionicons name={iconName} size={22} color={color} />
+            <Text style={[styles.tabLabel, { color }]}>{meta.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -134,7 +94,6 @@ const styles = StyleSheet.create({
     height: 72,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    // Shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
@@ -148,10 +107,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 8,
   },
-  tabIcon: {
-    fontSize: 22,
-    lineHeight: 26,
-  },
   tabLabel: {
     fontSize: 11,
     marginTop: 2,
@@ -161,7 +116,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    // The FAB overhangs the bar upward
     marginTop: -24,
   },
   fab: {
@@ -171,7 +125,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A6FFF',
     alignItems: 'center',
     justifyContent: 'center',
-    // Shadow
     ...Platform.select({
       ios: {
         shadowColor: '#1A6FFF',
@@ -179,16 +132,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.45,
         shadowRadius: 8,
       },
-      android: {
-        elevation: 8,
-      },
+      android: { elevation: 8 },
     }),
-  },
-  fabIcon: {
-    fontSize: 28,
-    color: '#FFFFFF',
-    fontWeight: '300',
-    lineHeight: 34,
-    textAlign: 'center',
   },
 });

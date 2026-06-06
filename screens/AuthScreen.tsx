@@ -7,6 +7,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -96,7 +97,7 @@ export default function AuthScreen({ navigation }: { navigation?: any }) {
               placeholderTextColor="#BDBDB8"
             />
             <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(v => !v)}>
-              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
 

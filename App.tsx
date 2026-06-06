@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -20,6 +21,11 @@ import OnboardingScreen from './screens/OnboardingScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import FoodLogScreen from './screens/FoodLogScreen';
 import WorkoutScreen from './screens/WorkoutScreen';
+import ActivityDetailScreen from './screens/ActivityDetailScreen';
+import AddExerciseScreen from './screens/AddExerciseScreen';
+import AddFoodScreen from './screens/AddFoodScreen';
+import FoodDetailScreen from './screens/FoodDetailScreen';
+import ConnectWearableScreen from './screens/ConnectWearableScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MotivationScreen from './screens/MotivationScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -32,7 +38,8 @@ const Tab = createBottomTabNavigator();
 
 interface FabOption {
   label: string;
-  emoji: string;
+  iconName: string;
+  iconSet: 'Ionicons' | 'MaterialCommunityIcons';
   bg: string;
   onPress: () => void;
 }
@@ -47,28 +54,32 @@ function FabModal({ visible, onClose, onNavigate }: FabModalProps) {
   const options: FabOption[] = [
     {
       label: 'Weight',
-      emoji: '⚖️',
+      iconName: 'scale-balance',
+      iconSet: 'MaterialCommunityIcons',
       bg: '#00C48C',
       onPress: () => { onClose(); onNavigate('Stats'); },
     },
     {
       label: 'Water',
-      emoji: '💧',
+      iconName: 'water-outline',
+      iconSet: 'Ionicons',
       bg: '#1A6FFF',
       onPress: () => {
         onClose();
-        Alert.alert('Water', 'Use the dashboard to track water');
+        Alert.alert('Water', 'Track your water intake on the Dashboard screen.');
       },
     },
     {
       label: 'Food',
-      emoji: '🍎',
+      iconName: 'restaurant-outline',
+      iconSet: 'Ionicons',
       bg: '#FF6B9D',
       onPress: () => { onClose(); onNavigate('Log'); },
     },
     {
       label: 'Exercise',
-      emoji: '🏋️',
+      iconName: 'barbell-outline',
+      iconSet: 'Ionicons',
       bg: '#FFB800',
       onPress: () => { onClose(); onNavigate('Workout'); },
     },
@@ -105,7 +116,10 @@ function FabModal({ visible, onClose, onNavigate }: FabModalProps) {
               activeOpacity={0.8}
             >
               <View style={[fab.iconCircle, { backgroundColor: opt.bg }]}>
-                <Text style={{ fontSize: 26 }}>{opt.emoji}</Text>
+                {opt.iconSet === 'Ionicons'
+                  ? <Ionicons name={opt.iconName as any} size={26} color="#FFF" />
+                  : <MaterialCommunityIcons name={opt.iconName as any} size={26} color="#FFF" />
+                }
               </View>
               <Text style={fab.gridLabel}>{opt.label}</Text>
             </TouchableOpacity>
@@ -288,6 +302,19 @@ function RootNavigator() {
               component={WorkoutScreen}
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="ActivityDetail"
+              component={ActivityDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AddExercise"
+              component={AddExerciseScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="AddFood" component={AddFoodScreen as any} options={{ headerShown: false }} />
+            <Stack.Screen name="FoodDetail" component={FoodDetailScreen as any} options={{ headerShown: false }} />
+            <Stack.Screen name="ConnectWearable" component={ConnectWearableScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="Motivation"
               component={MotivationScreen}

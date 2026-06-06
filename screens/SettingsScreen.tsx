@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, useThemeContext } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import Card from '../components/Card';
@@ -125,7 +126,7 @@ export default function SettingsScreen() {
           <View style={s.pwWrap}>
             <TextInput style={s.pwInput} value={newPassword} onChangeText={setNewPassword} placeholder="New password" placeholderTextColor={theme.muted} secureTextEntry={!showPw} />
             <TouchableOpacity style={s.pwToggle} onPress={() => setShowPw(v => !v)}>
-              <Text style={{ fontSize: 18 }}>{showPw ? '🙈' : '👁️'}</Text>
+              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
         </Card>

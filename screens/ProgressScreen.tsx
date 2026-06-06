@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, Alert, Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../lib/theme';
 import { useAuth } from '../lib/auth';
@@ -108,7 +109,7 @@ export default function ProgressScreen() {
           <Text style={s.stat}>Start: {vals[0].toFixed(1)} kg</Text>
           <Text style={s.stat}>Now: {vals[vals.length - 1].toFixed(1)} kg</Text>
           <Text style={[s.stat, { color: vals[vals.length - 1] < vals[0] ? '#4CAF50' : '#F44336' }]}>
-            {vals[vals.length - 1] < vals[0] ? '↓' : '↑'} {Math.abs(vals[vals.length - 1] - vals[0]).toFixed(1)} kg
+            {vals[vals.length - 1] < vals[0] ? '-' : '+'}{Math.abs(vals[vals.length - 1] - vals[0]).toFixed(1)} kg
           </Text>
         </View>
       </Card>
@@ -177,7 +178,7 @@ export default function ProgressScreen() {
                 {item.note ? <Text style={s.entryNote}>{item.note}</Text> : null}
               </View>
               <TouchableOpacity style={s.delBtn} onPress={() => deleteEntry(item.id)}>
-                <Text style={s.delText}>🗑</Text>
+                <Ionicons name="trash-outline" size={18} color="#F44336" />
               </TouchableOpacity>
             </View>
           </View>

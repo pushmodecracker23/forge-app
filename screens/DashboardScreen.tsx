@@ -13,6 +13,7 @@ import { useProfileStore } from '../store/profileStore';
 import GradientBg from '../components/GradientBg';
 import { FoodLog } from '../types/database';
 import { getHealthData, getExercises, ExerciseEntry } from '../lib/healthService';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -22,12 +23,9 @@ function formatDate(date: Date): string {
 
 function dateLabel(date: Date): string {
   const today = new Date();
-  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  if (formatDate(date) === formatDate(today)) return 'Today';
-  if (formatDate(date) === formatDate(yesterday)) return 'Yesterday';
-  if (formatDate(date) === formatDate(tomorrow)) return 'Tomorrow';
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  if (formatDate(date) === formatDate(today)) return `Today, ${dateStr}`;
+  return dateStr;
 }
 
 // ─── Multicolor Calorie Ring ──────────────────────────────────────────────────
@@ -286,22 +284,21 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
         {/* ── Header ── */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>≡</Text>
+            <Ionicons name="menu-outline" size={24} color="#FFF" />
           </TouchableOpacity>
 
           <View style={styles.dateRow}>
             <TouchableOpacity onPress={() => changeDay(-1)} style={styles.arrowBtn}>
-              <Text style={styles.arrowText}>‹</Text>
+              <Ionicons name="chevron-back" size={20} color="#FFF" />
             </TouchableOpacity>
             <Text style={styles.dateLabel}>{dateLabel(currentDate)}</Text>
             <TouchableOpacity onPress={() => changeDay(1)} style={styles.arrowBtn}>
-              <Text style={styles.arrowText}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>🔔</Text>
-            {/* red dot */}
+            <Ionicons name="notifications-outline" size={24} color="#FFF" />
             <View style={styles.notifDot} />
           </TouchableOpacity>
         </View>
@@ -390,20 +387,18 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
               {/* ── Apple Watch banner ── */}
               <TouchableOpacity
                 style={styles.watchBanner}
-                onPress={() =>
-                  Alert.alert(
-                    'Apple Watch',
-                    'TODO: real HealthKit — requires EAS Build, mocked for Expo Go',
-                  )
-                }
+                onPress={() => navigation.navigate('ConnectWearable')}
                 activeOpacity={0.8}
               >
                 <View style={styles.watchBannerLeft} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.watchTitle}>⌚ Apple Watch — tap to connect</Text>
-                  <Text style={styles.watchSub}>Sync workouts &amp; activity</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="watch-outline" size={18} color={theme.text} />
+                    <Text style={styles.watchTitle}>Connect Wearable</Text>
+                  </View>
+                  <Text style={styles.watchSub}>Sync workouts and activity data</Text>
                 </View>
-                <Text style={{ color: theme.muted, fontSize: 18 }}>›</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.muted} />
               </TouchableOpacity>
 
               {/* ── Exercise section ── */}
